@@ -23,6 +23,7 @@ type Book struct {
 	Author      string `json:"author"`
 	ISBN        string `json:"isbn"`
 	Description string `json:"description"`
+	CheckedOut  bool   `json:"checkedOut"`
 }
 
 func main() {
@@ -33,21 +34,20 @@ func main() {
 		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
 	}))
 
-	e.Static("/", "ui/dist")
-	e.File("/", "ui/dist/index.html")
-
 	books := []Book{
 		{
 			Title:       "The Great Gatsby",
 			Author:      "F. Scott Fitzgerald",
 			ISBN:        "9780743273565",
 			Description: "A novel about the American Dream",
+			CheckedOut:  false,
 		},
 		{
 			Title:       "To Kill a Mockingbird",
 			Author:      "Harper Lee",
 			ISBN:        "9780446310789",
 			Description: "A story of racial injustice and moral growth",
+			CheckedOut:  true,
 		},
 	}
 
@@ -88,6 +88,32 @@ func main() {
 		return c.JSON(http.StatusNoContent, books)
 	})
 
+	e.PUT("/book/:isbn", func(c echo.Context) error {
+		isbn := c.Param("isbn")
+		r := c.Request()
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Error("error in PUT", err)
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid Body Request"})
+		}
+
+		updatedBook := Book{}
+		err = json.Unmarshal(b, &updatedBook)
+		if err != nil {
+			log.Error(err)
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+		}
+
+		for i, book := range books {
+			if book.ISBN == isbn {
+				books[i] = updatedBook
+				return c.JSON(http.StatusOK, updatedBook)
+			}
+		}
+
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Book not found"})
+	})
+
 	e.Logger.Fatal(e.Start(":8888"))
 }
 
@@ -99,5 +125,3 @@ func removeBook(books []Book, isbn string) []Book {
 	}
 	return books
 }
-
-
